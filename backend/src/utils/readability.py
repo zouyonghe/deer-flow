@@ -1,5 +1,6 @@
 import logging
 import re
+import subprocess
 from urllib.parse import urljoin
 
 from markdownify import markdownify as md
@@ -58,10 +59,16 @@ class ReadabilityExtractor:
     def extract_article(self, html: str) -> Article:
         try:
             article = simple_json_from_html_string(html, use_readability=True)
-        except Exception as exc:
+        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+            stderr = getattr(exc, "stderr", None)
+            if isinstance(stderr, bytes):
+                stderr = stderr.decode(errors="replace")
+            stderr_info = f"; stderr={stderr.strip()}" if isinstance(stderr, str) and stderr.strip() else ""
             logger.warning(
-                "Readability.js extraction failed; falling back to pure-Python extraction: %s",
-                exc,
+                "Readability.js extraction failed with %s%s; falling back to pure-Python extraction",
+                type(exc).__name__,
+                stderr_info,
+                exc_info=True,
             )
             article = simple_json_from_html_string(html, use_readability=False)
 
